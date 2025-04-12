@@ -1,34 +1,14 @@
 [
   {
     "openai_api_type": "azure",
-    "openai_api_version": "2024-05-15-preview",  // Required API version for GPT-4o Mini in Azure
-    "openai_deployment_name": "gpt-4o-mini",     // Azure deployment name (must match exactly what's deployed)
-    "openai_model": "gpt-4o-mini-2024-07-18",    // Full model identifier for tracking/debugging
+    "openai_api_version": "2024-05-15-preview",
+    "openai_deployment_name": "gpt-4o-mini",
+    "openai_model": "gpt-4o-mini-2024-07-18",
     "openai_max_tokens": 1920,
-    "openai_temperature": 0.8,                   // Encourages dynamic and creative phrasing
-    "openai_top_p": 0.9,                         // Ensures word choice diversity
+    "openai_temperature": 0.8,
+    "openai_top_p": 0.9,
     "openai_frequency_penalty": 0,
     "openai_presence_penalty": 0,
-
-    // Telecom-specific structured summarization + escalation detection + PII tagging
-    // Prompt explanation:
-    // This prompt is designed to extract key business and behavioral signals from telecom support calls.
-    // It goes beyond summary by:
-    // - Identifying emotional shifts (e.g., frustration escalation)
-    // - Tagging sensitive data (PII)
-    // - Flagging loyalty risk and follow-up gaps
-    // - Classifying intent by issue category (Billing, Connectivity, etc.)
-    "telecom_prompt": "Analyze the following telecom customer service call and extract:\n\n1. Core issue reported by the customer (e.g., billing error, connectivity failure, equipment complaint).\n2. Classification of the issue: Billing, Connectivity, Retention, General Inquiry, Cancel.\n3. Specific resolution steps taken by the agent (e.g., diagnostics, refunds, technician scheduling).\n4. Degree of customer satisfaction at the end (choose: Satisfied, Dissatisfied, Angry, Frustrated, Neutral).\n5. Was follow-up offered or promised? (Yes/No, with details).\n6. List any personally identifiable information (PII) mentioned (e.g., phone number, email, account ID).\n7. Emotional tone progression of the customer throughout the call (e.g., Calm → Angry, Angry → Calmed, Neutral, Slow escalation, Negative but passive).\n8. Based on the emotional arc, return a recommended resolution tactic. Choose from:\n   - 🔥 Early empathy and proactive follow-up (for Calm → Angry)\n   - 👍 Quick fixes and firm responses (for Angry → Calmed)\n   - 🔍 Monitor for emotional volatility (for Neutral)\n   - 💣 Intervene before escalation completes (for Slow escalation)\n   - 💰 Offer tangible benefit or apology credit (for Negative but passive)\n\nNote:\n- Emotional tone should be based on clear cues in customer language.\n- Tactic must reflect behavioral patterns, not just issue type.\n- Use behavioral reasoning. If sentiment progression doesn't fit known patterns, describe the tone and suggest best-fit tactic based on customer affect and urgency.",
-
-    //What this does:
-    // Captures behavioral shifts during the call, like rising frustration or successful de-escalation.
-    // Useful for live QA or supervisor review.
-    // Common patterns include:
-    // 📌 Emotional Tone Progression      📌 Recommended Resolution Tactic                      Outcome
-    // - Calm → Angry                    → 🔥  Early empathy and proactive follow-up            Satisfaction ↑, Churn ↓
-    // - Angry → Calmed                  → 👍  Quick fixes, firm responses                      Loyalty potential ↑
-    // - Neutral                         → 🔍  Monitor for signs of emotional change             -
-    // - Slow escalation      → 💣  Intervene before detonation                      High churn risk
-    // - Negative but passive            → 💰  Offer tangible benefit or apology credit         Churn risk unless recognized
+    "telecom_prompt": "Analyze the following telecom customer service call and extract:\n\n1. Core issue reported by the customer (e.g., billing error, connectivity failure, equipment complaint).\n2. Classification of the issue: Billing, Connectivity, Retention, General Inquiry, Cancel.\n3. Specific resolution steps taken by the agent (e.g., diagnostics, refunds, technician scheduling).\n4. Degree of customer satisfaction at the end (choose: Satisfied, Dissatisfied, Angry, Frustrated, Neutral).\n5. Was follow-up offered or promised? (Yes/No, with details).\n6. List any personally identifiable information (PII) mentioned (e.g., phone number, email, account ID).\n7. Emotional tone progression of the customer throughout the call (e.g., Calm to Angry, Angry to Calmed, Neutral, Slow escalation, Negative but passive).\n8. Based on the emotional arc, return a recommended resolution tactic. Choose from:\n   - Early empathy and proactive follow-up (for Calm to Angry)\n   - Quick fixes and firm responses (for Angry to Calmed)\n   - Monitor for emotional volatility (for Neutral)\n   - Intervene before escalation completes (for Slow escalation)\n   - Offer tangible benefit or apology credit (for Negative but passive)\n\nNote:\n- Emotional tone should be based on clear cues in customer language.\n- Tactic must reflect behavioral patterns, not just issue type.\n- Use behavioral reasoning. If sentiment progression doesn't fit known patterns, describe the tone and suggest best-fit tactic based on customer affect and urgency."
   }
 ]

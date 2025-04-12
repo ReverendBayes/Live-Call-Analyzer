@@ -25,7 +25,6 @@ const openaiApiVersion = openaiconfig[0].openai_api_version;
 
 // Default telecom prompt fallback
 const telecomPrompt = openaiconfig[0].telecom_prompt || "Summarize this telecom customer support call with key issues, resolution steps, and any sentiment cues.";
-const generalPrompt = openaiconfig[0].general_prompt;
 
 // Health check route
 // Used to confirm the backend is alive and reachable by frontend or monitoring

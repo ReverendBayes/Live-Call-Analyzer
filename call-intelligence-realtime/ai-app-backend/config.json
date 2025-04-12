@@ -1,0 +1,14 @@
+[
+    {
+        "name": "speech",
+        "speech_subscription_key": "SPEECH_KEY_FROM_AZURE_PORTAL",
+        "speech_region": "SPEECH_REGION_FROM_AZURE_PORTAL",
+        "speech_custom_endpoint_id_optional": "OPTIONAL_FROM_SPEECH_STUDIO",
+        "text_analytics_key": "LANGUAGE_KEY_FROM_AZURE_PORTAL",
+        "text_analytics_endpoint": "LANGUAGE_ENDPOINT_FROM_AZURE_PORTAL",
+        "openai_endpoint": "OPENAI_ENDPOINT_FROM_OPENAI_STUDIO",
+        "openai_key": "OPENAI_KEY_FROM_AZURE_PORTAL",
+        "openai_deployment_name": "OPENAI_DEPLOYMET_FROM_OPENAI_STUDIO",
+        "web_port": "8080"
+    }
+]

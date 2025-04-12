@@ -1,86 +1,74 @@
-// Express routes for Azure AI Language API
-//
+// Express routes for Azure AI Language API (Key Phrase Extraction, Entity Recognition, PII Detection)
+
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
+const { TextAnalyticsClient, AzureKeyCredential } = require('@azure/ai-text-analytics');
 const config = require('../config.json');
 
-// get config
+// Load Azure Text Analytics credentials
 const textAnalyticsKey = config[0].text_analytics_key;
-const textAnalyticsEndpoint = config[0].text_analytics_endpoint;    
+const textAnalyticsEndpoint = config[0].text_analytics_endpoint;
 
-//"use strict";
-const { TextAnalyticsClient, AzureKeyCredential } = require("@azure/ai-text-analytics");
-const { json } = require('express');
-
+// Health check route
 router.get('/ta/sayhello', async (req, res) => {
-    const currentDateTime = new Date();
-    res.send('Hello World from the Azure Language TA backend! ' + currentDateTime)
+  res.send('Hello World from the Azure Language TA backend! ' + new Date());
 });
 
-router.post('/ta-key-phrases', async (req, res) => { 
-    const requestJSON = JSON.stringify(req.body);
-    //console.log('JSON string request body ' + requestJSON);
+// Key phrases, entity recognition, and PII redaction route
+router.post('/ta-key-phrases', async (req, res) => {
+  const requestText = req.body.transcript;
 
-    const requestText = JSON.stringify(req.body.transcript);
-    //console.log('Received transcription text : ' + requestText);
+  if (!requestText || typeof requestText !== 'string') {
+    return res.status(400).send('Invalid or missing transcript');
+  }
 
-    try {
-        const keyPhrasesInput = [
-            requestText,
-        ];
-        const textAnalyticsClient = new TextAnalyticsClient(textAnalyticsEndpoint,  new AzureKeyCredential(textAnalyticsKey));
+  try {
+    const inputArray = [requestText];
+    const client = new TextAnalyticsClient(textAnalyticsEndpoint, new AzureKeyCredential(textAnalyticsKey));
 
-        let keyPhrasesText = "KEY PHRASES: ";
-        const keyPhraseResult =  await textAnalyticsClient.extractKeyPhrases(keyPhrasesInput);             
-        keyPhraseResult.forEach(document => {            
-            keyPhraseResponse = document.keyPhrases;    
-            keyPhrasesText += document.keyPhrases;                   
-        });   
+    // Key phrase extraction
+    const keyPhraseResult = await client.extractKeyPhrases(inputArray);
+    let keyPhrasesText = "KEY PHRASES: ";
+    keyPhraseResult.forEach(document => {
+      if (!document.error) {
+        keyPhrasesText += document.keyPhrases.join(', ') + ' ';
+      }
+    });
 
-        //let entityText = "ENTITIES: ";
-        let entityText = "  ";
-        const entityResults = await textAnalyticsClient.recognizeEntities(keyPhrasesInput);        
-        entityResults.forEach(document => {
-            //console.log(`Document ID: ${document.id}`);
-            document.entities.forEach(entity => {
-                if(entity.confidenceScore > 0.5){
-                    //console.log(`\tName: ${entity.text} \tCategory: ${entity.category} \tSubcategory: ${entity.subCategory ? entity.subCategory : "N/A"}`);
-                    const currentEntity = entity.category + ": " + entity.text;
-                    entityText += " " + currentEntity;
-                    //console.log(`\tScore: ${entity.confidenceScore}`);                    
-                }
-            });
-        });          
+    // Entity recognition (non-PII)
+    const entityResults = await client.recognizeEntities(inputArray);
+    let entityText = "ENTITIES: ";
+    entityResults.forEach(document => {
+      if (!document.error) {
+        document.entities.forEach(entity => {
+          if (entity.confidenceScore > 0.5) {
+            const currentEntity = `${entity.category}: ${entity.text}`;
+            entityText += currentEntity + ' | ';
+          }
+        });
+      }
+    });
 
-        let piiText = "PII:";
-        const piiResults = await textAnalyticsClient.recognizePiiEntities(keyPhrasesInput, "en");
-        for (const result of piiResults) {
-            if (result.error === undefined) {
-                if(result.redactedText.indexOf('*') > -1){
-                    //console.log("Redacted Text: ", result.redactedText);
-                    piiText += result.redactedText;
-                    //console.log(" -- Recognized PII entities for input", result.id, "--");
-                }
+    // PII recognition
+    const piiResults = await client.recognizePiiEntities(inputArray, "en");
+    let piiText = "PII (Redacted): ";
+    piiResults.forEach(result => {
+      if (!result.error && result.redactedText.includes('*')) {
+        piiText += result.redactedText;
+      }
+    });
 
-                for (const entity of result.entities) {
-                    //console.log(entity.text, ":", entity.category, "(Score:", entity.confidenceScore, ")");
-                    const currentEntity = entity.category + ": " + entity.text;
-                    //piiText += currentEntity;
-                }
-            } else {
-                console.error("Encountered an error:", result.error);
-            }
-        }
+    // Final JSON response
+    res.status(200).json({
+      keyPhrasesExtracted: keyPhrasesText.trim(),
+      entityExtracted: entityText.trim(),
+      piiExtracted: piiText.trim()
+    });
 
-        const headers = { 'Content-Type': 'application/json' };  
-        res.headers = headers;                  
-        //res.send({ keyPhrasesExtracted: keyPhraseResponse, entityExtracted: entityResults, piiExtracted: piiResults });
-        res.send({ keyPhrasesExtracted: keyPhrasesText, entityExtracted: entityText, piiExtracted: piiText });
-    } catch (err) {
-        console.log(err);
-        res.status(401).send('There was an error authorizing your text analytics key. Check your text analytics service key or endpoint to the .env file.');
-    }        
+  } catch (err) {
+    console.error('Azure TA error:', err.message || err);
+    res.status(500).send('Azure Text Analytics error. Check keys, endpoint, and API availability.');
+  }
 });
 
 module.exports = router;

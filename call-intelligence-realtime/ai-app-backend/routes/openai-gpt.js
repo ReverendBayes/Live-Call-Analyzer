@@ -1,17 +1,21 @@
-// Express routes for the OpenAI GPT-3 API
+// Express routes for Azure OpenAI GPT-4o Mini (Telecom-specific)
+// This file powers all GPT-related summarization routes for telecom calls.
+// It handles long transcripts, applies truncation, optional pre-summarization,
+// and routes data to Azure's Chat Completion endpoint using a deployed GPT-4o Mini model.
+
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const config = require('../config.json');
-const openaiconfig = require('./openai-config.json');
-const { writeData, updateData } = require('../data/data-logging.js')
+const config = require('../config.json');               // API keys and deployment settings
+const openaiconfig = require('./openai-config.json');   // Prompt tuning and token limits
+const { writeData } = require('../data/data-logging.js');
 
-//Set up OpenAI API key and endpoint
+// Load Azure OpenAI credentials and deployment info
 const openaiKey = config[0].openai_key;
 const openaiEndpoint = config[0].openai_endpoint;
-const openaiDeploymentName = config[0].openai_deployment_name;
+const openaiDeploymentName = config[0].openai_deployment_name; // Deployment name registered in Azure OpenAI for the model 'gpt-4o-mini-2024-07-18'
 
-//Set up OpenAI GPT-3 parameters
+// Load model tuning parameters from config
 const openaiMaxTokens = openaiconfig[0].openai_max_tokens;
 const openaiTemperature = openaiconfig[0].openai_temperature;
 const openaiTopP = openaiconfig[0].openai_top_p;
@@ -19,219 +23,127 @@ const openaiFrequencyPenalty = openaiconfig[0].openai_frequency_penalty;
 const openaiPresencePenalty = openaiconfig[0].openai_presence_penalty;
 const openaiApiVersion = openaiconfig[0].openai_api_version;
 
-//Set up OpenAI GPT-3 prompts by business domain
-const insurancePrompt = openaiconfig[0].insurance_prompt;
-const healthcarePrompt = openaiconfig[0].healthcare_prompt;
-const bankingPrompt = openaiconfig[0].banking_prompt;
-const capitalMarketsPrompt = openaiconfig[0].capitalmarkets_prompt;
+// Default telecom prompt fallback
+const telecomPrompt = openaiconfig[0].telecom_prompt || "Summarize this telecom customer support call with key issues, resolution steps, and any sentiment cues.";
 const generalPrompt = openaiconfig[0].general_prompt;
 
+// Health check route
+// Used to confirm the backend is alive and reachable by frontend or monitoring
 router.get('/gpt/sayhello', async (req, res) => {
-  const currentDateTime = new Date();
-  res.send('Hello World from the OpenAI GPT backend! ' + currentDateTime)
+  res.send('Hello from the Azure GPT-4o Mini backend! ' + new Date());
 });
 
+// Main route for custom prompts
+// 1. Receives a transcript + user-defined prompt
+// 2. Truncates the transcript if it's too long
+// 3. Summarizes the start if truncated to preserve context
+// 4. Appends prompt, sends to Azure OpenAI GPT-4o Mini
 router.post('/gpt/customPrompt', async (req, res) => {
- 
   const requestText = JSON.stringify(req.body.transcript);
   const requestCustomPrompt = req.body.customPrompt;
 
-  // Calculate the maximum number of tokens allowed
-  const maxTokenLimit = 3000; // Replace with the appropriate token limit for your model
+  const maxTokenLimit = 3000; // Custom limit for model buffer
+  let truncatedTranscript = truncateText(requestText, maxTokenLimit);
 
-  // Truncate or reduce the length of the transcript
-  var truncatedTranscript = truncateText(requestText, maxTokenLimit);
-
-  // Check if the truncated transcript is smaller than the original text
+  // If we had to trim, summarize the front to keep context
   if (truncatedTranscript.length < requestText.length) {
-    // Generate summary for truncated transcript
     const summary = await generateSummary(truncatedTranscript);
-    // Concatenate the summary with the remaining tokens of the requestText
     truncatedTranscript = summary + requestText.substring(truncatedTranscript.length);
   }
 
-  const customParsePrompt = truncatedTranscript + "\n\n" + requestCustomPrompt;
-  console.log(customParsePrompt);
-
-  const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;
-
-  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
-  const params = {
-    "prompt": customParsePrompt,
-    "max_tokens": 1000,
-    "temperature": openaiTemperature,
-    "top_p": openaiTopP,
-    "frequency_penalty": openaiFrequencyPenalty,
-    "presence_penalty": openaiPresencePenalty
-  }
-  try {
-    const completionResponse = await axios.post(url, params, { headers: headers });
-    res.send(completionResponse.data.choices[0]);
-    writeData(req.body.transcript, requestCustomPrompt, completionResponse.data.choices[0], req.ip)
-  } catch (error) {
-    console.error('ERROR WITH AZURE OPENAI API:', error.message);
-    res.send(error.message)
-    writeData(req.body.transcript, requestCustomPrompt, error, req.ip)
-  }
-
-});
-
-router.post('/gpt/DiarizationPrompt', async (req, res) => {
-
-  const requestText = JSON.stringify(req.body.transcript);
-  const requestCustomPrompt = req.body.customPrompt;
-
-  // Calculate the maximum number of tokens allowed
-  const maxTokenLimit = 1500; // Replace with the appropriate token limit for your model
-
-  // Truncate or reduce the length of the transcript
-  const truncatedTranscript = truncateText(requestText, maxTokenLimit);
-
-  const customParsePrompt = truncatedTranscript + "\n\n" + requestCustomPrompt;
-  const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;
-
-  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
-  const params = {
-    "prompt": customParsePrompt,
-    "max_tokens": 1000,
-    "temperature": openaiTemperature,
-    "top_p": openaiTopP,
-    "frequency_penalty": openaiFrequencyPenalty,
-    "presence_penalty": openaiPresencePenalty
-  }
-  try {
-    const completionResponse = await axios.post(url, params, { headers: headers });
-    res.send(completionResponse.data.choices[0]);
-  } catch (error) {
-    console.error('ERROR WITH AZURE OPENAI API:', error.message);
-    res.send(error.message)
-  }
-});
-
-router.post('/gpt/summarize', async (req, res) => {
-  const requestText = JSON.stringify(req.body.transcript);
-  const truncatedTranscript = truncateText(requestText, maxTokenLimit);
-
-  const summaryPrompt = truncatedTranscript + "\n\nTl;dr";
-  const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;
-
-  //console.log('Prompt for summary ' + summaryPrompt);    
-  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
-  const params = {
-    "prompt": summaryPrompt,
-    "max_tokens": openaiMaxTokens,
-    "temperature": openaiTemperature,
-    "top_p": openaiTopP,
-    "frequency_penalty": openaiFrequencyPenalty,
-    "presence_penalty": openaiPresencePenalty
-  }
-
-  // const summaryResponse = await axios.post(url, params, {headers: headers});
-  // res.send(summaryResponse.data.choices[0]);    
-  try {
-    const summaryResponse = await axios.post(url, params, { headers: headers });
-    res.send(summaryResponse.data.choices[0]);
-  } catch (error) {
-    console.error('ERROR WITH AZURE OPENAI API:', error.message);
-    res.send(error.message)
-  }
-});
-
-router.post('/gpt/parseExtractInfo', async (req, res) => {
-  const requestText = JSON.stringify(req.body.transcript);
-  const requestPromptCategory = req.body.parsePromptCategory;
-  let requestPrompt = "";
-  console.log('Request prompt category: ' + requestPromptCategory);
-
-  if (requestPromptCategory == "Insurance") {
-    requestPrompt = insurancePrompt;
-  } else if (requestPromptCategory == "Healthcare") {
-    requestPrompt = healthcarePrompt;
-  } else if (requestPromptCategory == "Banking") {
-    requestPrompt = bankingPrompt;
-  } else if (requestPromptCategory == "CapitalMarkets") {
-    requestPrompt = capitalMarketsPrompt;
-  } else {
-    requestPrompt = generalPrompt;
-  }
-
-  //console.log('Using Request prompt: ' + requestPrompt);
-  // const parsePrompt = requestText + "\n\n" + requestPrompt;
-
-  // const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;        
-
-  // Calculate the maximum number of tokens allowed
-  const maxTokenLimit = 2040; // Replace with the appropriate token limit for your model
-
-  // Truncate or reduce the length of the transcript
-  const truncatedTranscript = truncateText(req.body.transcript, maxTokenLimit);
-
-  // Construct the parsePrompt by combining the truncated transcript and requestPrompt
-  const parsePrompt = truncatedTranscript + "\n\n" + requestPrompt;
-
-  const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;
-
-  //console.log('Prompt for parseExtractInfo ' + parsePrompt);    
-  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
-  const params = {
-    "prompt": parsePrompt,
-    "max_tokens": 1000,
-    "temperature": 0.1,
-    "top_p": 1,
-    "frequency_penalty": 0,
-    "presence_penalty": 0
-  }
-
-  const parseResponse = await axios.post(url, params, { headers: headers });
-  //console.log('Parse response: ' + parseResponse.data);
-  res.send(parseResponse.data.choices[0]);
-});
-
-// Function to truncate text while preserving complete sentences
-function truncateText(text, maxLength) {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  const truncatedText = text.slice(0, maxLength);
-  const lastSentenceEnd = truncatedText.lastIndexOf(".");
-
-  if (lastSentenceEnd !== -1) {
-    return truncatedText.slice(0, lastSentenceEnd + 1);
-  }
-
-  return truncatedText;
-}
-
-// Function to generate a summary using GPT
-async function generateSummary(text) {
-
-  const requestText = JSON.stringify(text);
-
-  const summaryPrompt = requestText + "\n\nSummarize the conversation containing the names of the the agent and the customer and all the important topics discussed. Avoid sentence repitition.";
-
-  const url = openaiEndpoint + 'openai/deployments/' + openaiDeploymentName + '/completions?api-version=' + openaiApiVersion;
+  const fullPrompt = truncatedTranscript + "\n\n" + requestCustomPrompt;
+  const url = `${openaiEndpoint}openai/deployments/${openaiDeploymentName}/chat/completions?api-version=${openaiApiVersion}`;
   const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
 
-  const params = {
-    "prompt": summaryPrompt,
-    "max_tokens": 1000,
-    "temperature": openaiTemperature,
-    "top_p": openaiTopP,
-    "frequency_penalty": openaiFrequencyPenalty,
-    "presence_penalty": openaiPresencePenalty
+  const body = {
+    messages: [
+      { role: "system", content: "You are a helpful assistant summarizing telecom support calls." },
+      { role: "user", content: fullPrompt }
+    ],
+    max_tokens: 1000,
+    temperature: openaiTemperature,
+    top_p: openaiTopP,
+    frequency_penalty: openaiFrequencyPenalty,
+    presence_penalty: openaiPresencePenalty
   };
 
   try {
-    const response = await axios.post(url, params, { headers: headers });
-    const completion = response.data.choices[0].text.trim();
-
-    return completion;
+    const completion = await axios.post(url, body, { headers });
+    res.send(completion.data.choices[0].message);
+    writeData(req.body.transcript, requestCustomPrompt, completion.data.choices[0].message, req.ip);
   } catch (error) {
-    console.error('ERROR WITH AZURE OPENAI API:', error.message);
-    return ''; // Return an empty string or handle the error as needed
+    console.error('OpenAI error:', error.message);
+    res.send(error.message);
+    writeData(req.body.transcript, requestCustomPrompt, error, req.ip);
+  }
+});
+
+// Route to summarize full transcript with a "tl;dr"
+// Simpler endpoint if user wants automatic summary only
+router.post('/gpt/summarize', async (req, res) => {
+  const requestText = JSON.stringify(req.body.transcript);
+  const truncatedTranscript = truncateText(requestText, openaiMaxTokens);
+
+  const fullPrompt = truncatedTranscript + "\n\nTl;dr";
+  const url = `${openaiEndpoint}openai/deployments/${openaiDeploymentName}/chat/completions?api-version=${openaiApiVersion}`;
+  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
+
+  const body = {
+    messages: [
+      { role: "system", content: "You are a helpful assistant summarizing telecom support calls." },
+      { role: "user", content: fullPrompt }
+    ],
+    max_tokens: openaiMaxTokens,
+    temperature: openaiTemperature,
+    top_p: openaiTopP,
+    frequency_penalty: openaiFrequencyPenalty,
+    presence_penalty: openaiPresencePenalty
+  };
+
+  try {
+    const response = await axios.post(url, body, { headers });
+    res.send(response.data.choices[0].message);
+  } catch (error) {
+    console.error('Summarization error:', error.message);
+    res.send(error.message);
+  }
+});
+
+// Transcript text clipper
+// Shortens content to avoid hitting GPT token limits — preserves sentence endings
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  const slice = text.slice(0, maxLength);
+  const lastDot = slice.lastIndexOf(".");
+  return lastDot !== -1 ? slice.slice(0, lastDot + 1) : slice;
+}
+
+// Pre-summarizer
+// When a transcript is too long, this creates a summary chunk GPT can use as compressed context
+async function generateSummary(text) {
+  const summaryPrompt = JSON.stringify(text) + "\n\nSummarize the key parts of this telecom support call, naming agent and customer if possible.";
+  const url = `${openaiEndpoint}openai/deployments/${openaiDeploymentName}/chat/completions?api-version=${openaiApiVersion}`;
+  const headers = { 'Content-Type': 'application/json', 'api-key': openaiKey };
+
+  const body = {
+    messages: [
+      { role: "system", content: "You are a summarizer for telecom support calls." },
+      { role: "user", content: summaryPrompt }
+    ],
+    max_tokens: 1000,
+    temperature: openaiTemperature,
+    top_p: openaiTopP,
+    frequency_penalty: openaiFrequencyPenalty,
+    presence_penalty: openaiPresencePenalty
+  };
+
+  try {
+    const res = await axios.post(url, body, { headers });
+    return res.data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Summary fallback failed:', error.message);
+    return '';
   }
 }
 
 module.exports = router;
-

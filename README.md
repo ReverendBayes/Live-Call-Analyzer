@@ -1,17 +1,5 @@
 ## Live-Call-Analyzer (Telecom)
 
-- ### Use This If You Need:
-
-- Real-time speech-to-text pipelines that actually work
-- Transcription with actionable insights for telecom calls  
-- LLM-powered analysis: sentiment, intent, summaries, classification, churn risk, and escalation detection  
-- Live escalation mapping and resolution tactic recommendations  
-- Azure-centric architecture that scales without duct tape  
-- Power BI as a plug-and-play analytics frontend for post-call insights
-
----
-### 🔍 Overview
-
 **Live-Call-Analyzer** is a modular application that analyzes telecom customer service conversations using a real-time AI pipeline built on:
 
 - **Azure Speech Services** for audio transcription  
@@ -19,7 +7,7 @@
 - **Azure OpenAI (GPT-4o)** for structured summarization, sentiment analysis, and escalation strategy  
 - **Power BI** for post-call visualization of customer sentiment, issue types, agent performance, and resolution patterns
 
-It functions as a **reference solution** — or **accelerator** — that can be extended into production use cases or customized for related domains (e.g., finance, healthcare).
+It functions as a **reference solution** — or **accelerator** — that can be extended into production use cases or customized for related domains (e.g., telecom call centers, finance, healthcare).
 
 ---
 
@@ -75,7 +63,7 @@ Live-Call-Analyzer/
 │   ├── ai-app-backend/                         # Node.js API backend
 │   │   ├── serverapp.js                        # Express server entrypoint
 │   │   ├── routes/
-│   │   │   ├── openai-gpt.js                   # GPT-4o summarization logic
+│   │   │   ├── openai-gpt.js                   # GPT-4o summarization logic (GPT-3.5 has 1/10th the token cost of GPT-4o, which may be preferrable for large volume)
 │   │   │   ├── azureai-language.js             # Azure Text Analytics integration
 │   │   │   └── openai-config.json              # Prompt & model settings
 │   │   ├── config.json                         # Credential and region configuration
@@ -98,7 +86,7 @@ Live-Call-Analyzer/
 │   ├── SentimentInsights.pbit                  # Sentiment dashboard template
 │   └── SpeechInsights.pbit                     # Speech + topic dashboard template
 │
-└── README.md                                   # Project overview and instructions
+└── README.md                                   # Project overview
 ```
 
 

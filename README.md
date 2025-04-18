@@ -1,6 +1,6 @@
 ## Live-Call-Analyzer (Telecom)
 
-- ### ✅ Use This If You Need:
+- ### Use This If You Need:
 
 - Real-time speech-to-text pipelines that actually work
 - Transcription with actionable insights for telecom calls  
@@ -23,7 +23,7 @@ It functions as a **reference solution** — or **accelerator** — that can be 
 
 ---
 
-### 🧠 `telecom_prompt`: Structured Call Intelligence
+### `telecom_prompt`: Structured Call Intelligence
 
 This specialized prompt extracts **business and behavioral signals** from raw transcripts. It’s designed for live agent QA, retention analysis, and escalation monitoring — not just summaries.
 
@@ -56,7 +56,7 @@ The model extracts:
 
 ---
 
-### 🧭 Why This Matters
+### Why This Matters
 
 - Uses **behavioral reasoning**, not just topic classification  
 - Enables **real-time coaching**, **QA auditing**, and **escalation prediction**  
@@ -67,7 +67,7 @@ The model extracts:
 
 ---
 
-### 📦 Project Layout
+### Project Layout
 
 ```bash
 Live-Call-Analyzer/
